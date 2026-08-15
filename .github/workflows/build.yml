@@ -2,8 +2,8 @@ name: "Build Desktop (Windows & macOS)"
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -41,6 +41,8 @@ jobs:
           npm ci
 
       - name: Build frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           cd client
           npm run build
@@ -83,6 +85,8 @@ jobs:
           npm ci
 
       - name: Build frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           cd client
           npm run build
