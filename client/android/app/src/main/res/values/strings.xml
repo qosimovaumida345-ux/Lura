@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lura</string>
+    <string name="title_activity_main">Lura</string>
+    <string name="package_name">app.lura.editor</string>
+    <string name="custom_url_scheme">app.lura.editor</string>
+</resources>
