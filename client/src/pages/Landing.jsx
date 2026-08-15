@@ -113,14 +113,14 @@ export default function Landing() {
         {/* Download Dropdown */}
         {showDownload && (
           <div className="download-dropdown animate-scale-in">
-            <a href="https://github.com/user/lura/releases/latest" className="download-option" target="_blank" rel="noreferrer">
+            <a href="https://github.com/qosimovaumida345-ux/Lura/releases/latest" className="download-option" target="_blank" rel="noreferrer">
               <IconWindows />
               <div>
                 <strong>Windows</strong>
                 <span>Windows 10/11 — .exe (64-bit)</span>
               </div>
             </a>
-            <a href="https://github.com/user/lura/releases/latest" className="download-option" target="_blank" rel="noreferrer">
+            <a href="https://github.com/qosimovaumida345-ux/Lura/releases/latest" className="download-option" target="_blank" rel="noreferrer">
               <IconAndroid />
               <div>
                 <strong>Android</strong>
@@ -221,10 +221,10 @@ export default function Landing() {
           <h2>Lura'ni hoziroq yuklab oling</h2>
           <p>Windows, Android va brauzer uchun mavjud. To'liq bepul, reklama va limitlarsiz.</p>
           <div className="download-buttons">
-            <a href="https://github.com/user/lura/releases/latest" className="btn btn-primary btn-lg download-btn" target="_blank" rel="noreferrer">
+            <a href="https://github.com/qosimovaumida345-ux/Lura/releases/latest" className="btn btn-primary btn-lg download-btn" target="_blank" rel="noreferrer">
               <IconWindows /> Windows uchun (.exe)
             </a>
-            <a href="https://github.com/user/lura/releases/latest" className="btn btn-secondary btn-lg download-btn" target="_blank" rel="noreferrer">
+            <a href="https://github.com/qosimovaumida345-ux/Lura/releases/latest" className="btn btn-secondary btn-lg download-btn" target="_blank" rel="noreferrer">
               <IconAndroid /> Android uchun (.apk)
             </a>
           </div>
