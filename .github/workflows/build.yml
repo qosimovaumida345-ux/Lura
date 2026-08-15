@@ -49,15 +49,24 @@ jobs:
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: client
-          tagName: ${{ github.ref_name }}
-          releaseName: "Lura ${{ github.ref_name }}"
-          releaseBody: "Lura Video Editor - ${{ github.ref_name }} release"
-          releaseDraft: true
-          prerelease: false
+
+      - name: Upload Windows Artifact
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lura-Windows-EXE
+          path: client/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 30
+
+      - name: Upload macOS Artifact
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lura-macOS-DMG
+          path: client/src-tauri/target/release/bundle/dmg/*.dmg
+          retention-days: 30
 
   build-android:
     runs-on: ubuntu-latest
