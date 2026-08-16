@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+app.set('trust proxy', 1); // Render uchun muhim!
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
   credentials: true
@@ -27,7 +28,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/auth/google/callback"
+    callbackURL: "/auth/google/callback",
+    proxy: true // Render'dagi HTTPS uchun majburiy
   },
   function(accessToken, refreshToken, profile, cb) {
     let user = users.find(u => u.googleId === profile.id);
