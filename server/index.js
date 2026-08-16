@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
@@ -35,8 +36,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         id: `user_${Date.now()}`,
         googleId: profile.id,
         display_name: profile.displayName,
-        email: profile.emails[0].value,
-        avatar_url: profile.photos[0].value
+        email: (profile.emails && profile.emails[0]) ? profile.emails[0].value : '',
+        avatar_url: (profile.photos && profile.photos[0]) ? profile.photos[0].value : ''
       };
       users.push(user);
     }
@@ -50,7 +51,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.authenticate('google', { failureRedirect: '/login', session: false }),
     function(req, res) {
       const token = jwt.sign({ id: req.user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
-      const clientUrl = process.env.CLIENT_URL === '*' ? 'http://localhost:5173' : process.env.CLIENT_URL;
+      const clientUrl = process.env.CLIENT_URL === '*' ? '' : (process.env.CLIENT_URL || '');
       res.redirect(`${clientUrl}/login?token=${token}&user=${encodeURIComponent(JSON.stringify(req.user))}`);
     });
 }
@@ -84,7 +85,6 @@ app.post('/api/ai/chat', async (req, res) => {
     const { messages } = req.body;
     
     if (!process.env.OPENROUTER_API_KEY) {
-      // Mock response if no API key
       return res.json({
         choices: [{
           message: {
@@ -103,9 +103,9 @@ app.post('/api/ai/chat', async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3-8b-instruct:free", // Free tier model
+        model: "meta-llama/llama-3-8b-instruct:free",
         messages: [
-          { role: 'system', content: 'You are LuraEditorAI, an intelligent video editing assistant. You help users create amazing videos.' },
+          { role: 'system', content: 'You are LuraEditorAI, an intelligent video editing assistant.' },
           ...messages
         ]
       })
@@ -120,12 +120,19 @@ app.post('/api/ai/chat', async (req, res) => {
 });
 
 // Serve frontend in production (SPA fallback)
-app.use(express.static(path.join(__dirname, '../client/dist')));
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-});
+const distPath = path.join(__dirname, '../client/dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.use((req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  app.use((req, res) => {
+    res.json({ status: 'ok', message: 'Lura API is running. Frontend not built yet.' });
+  });
+}
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Lura Server running on http://localhost:${PORT}`);
+  console.log(`Lura Server running on port ${PORT}`);
 });

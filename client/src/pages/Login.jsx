@@ -33,6 +33,9 @@ export default function Login() {
 
   return (
     <div className="login-page">
+      <video autoPlay muted loop playsInline className="login-bg-video">
+        <source src="/login-video.mp4" type="video/mp4" />
+      </video>
       <div className="login-card glass-card">
         <img src="/logo.png" alt="Lura Logo" className="login-logo" />
         <h2>Lura'ga Xush Kelibsiz</h2>

@@ -53,7 +53,7 @@ const stats = [
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { isAuthenticated, loginDemo } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const [showDownload, setShowDownload] = useState(false);
 
   React.useEffect(() => {
@@ -61,8 +61,7 @@ export default function Landing() {
   }, [isAuthenticated, navigate]);
 
   const handleGetStarted = () => {
-    loginDemo();
-    navigate('/dashboard');
+    navigate('/login');
   };
 
   return (
@@ -141,10 +140,12 @@ export default function Landing() {
         ))}
       </section>
 
-      {/* Editor Preview */}
+      {/* Editor Preview with Hero Video */}
       <section className="landing-preview" id="editor">
         <div className="preview-image-wrapper">
-          <img src="/editor-preview.jpg" alt="Lura Editor Interface" />
+          <video autoPlay muted loop playsInline style={{ width: '100%', borderRadius: '16px' }}>
+            <source src="/hero-video.mp4" type="video/mp4" />
+          </video>
           <div className="preview-glow" />
         </div>
       </section>
