@@ -1182,3 +1182,32 @@
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* ============================================
+   RESPONSIVE DESIGN (MOBILE / TABLET)
+   ============================================ */
+@media (max-width: 900px) {
+  .editor-main {
+    flex-direction: column;
+  }
+  
+  .preview-panel {
+    min-height: 250px;
+    flex: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  
+  .asset-panel {
+    width: 100%;
+    flex: 1;
+    border-left: none;
+  }
+  
+  .timeline-panel {
+    height: 35vh;
+  }
+  
+  .toolbar-left .project-name {
+    max-width: 120px;
+  }
+}

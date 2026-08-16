@@ -1,6 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,9 +15,45 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(passport.initialize());
 
 // --- Mock DB for MVP ---
 const projects = [];
+const users = [];
+
+// --- Google OAuth Setup ---
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    let user = users.find(u => u.googleId === profile.id);
+    if (!user) {
+      user = {
+        id: `user_${Date.now()}`,
+        googleId: profile.id,
+        display_name: profile.displayName,
+        email: profile.emails[0].value,
+        avatar_url: profile.photos[0].value
+      };
+      users.push(user);
+    }
+    return cb(null, user);
+  }));
+
+  app.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+
+  app.get('/auth/google/callback', 
+    passport.authenticate('google', { failureRedirect: '/login', session: false }),
+    function(req, res) {
+      const token = jwt.sign({ id: req.user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '7d' });
+      const clientUrl = process.env.CLIENT_URL === '*' ? 'http://localhost:5173' : process.env.CLIENT_URL;
+      res.redirect(`${clientUrl}/login?token=${token}&user=${encodeURIComponent(JSON.stringify(req.user))}`);
+    });
+}
 
 // --- Routes ---
 
@@ -77,6 +117,12 @@ app.post('/api/ai/chat', async (req, res) => {
     console.error('AI Error:', error);
     res.status(500).json({ error: 'AI bilan bog`lanishda xatolik yuz berdi.' });
   }
+});
+
+// Serve frontend in production (SPA fallback)
+app.use(express.static(path.join(__dirname, '../client/dist')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 // Start server

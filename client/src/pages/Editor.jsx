@@ -84,18 +84,53 @@ export default function Editor() {
   // Redirect if project not found
   useEffect(() => { if (!project) navigate('/dashboard'); }, [project, navigate]);
 
-  // Playback
+  // Playback & Audio Engine
+  const activeAudios = useRef(new Map());
+
   useEffect(() => {
     let interval;
     if (isPlaying) {
       interval = setInterval(() => {
         const t = useTimelineStore.getState().currentTime + 0.033;
-        if (t >= duration) { setCurrentTime(0); togglePlay(); }
-        else setCurrentTime(t);
+        if (t >= duration) { 
+          setCurrentTime(0); 
+          togglePlay(); 
+        } else {
+          setCurrentTime(t);
+        }
       }, 33);
     }
+    
+    // Sync Audio
+    tracks.filter(t => t.type === 'audio').forEach(track => {
+      track.clips.forEach(clip => {
+        if (!clip.src) return;
+        
+        let audioEl = activeAudios.current.get(clip.id);
+        
+        if (isPlaying && currentTime >= clip.startTime && currentTime < clip.startTime + clip.duration) {
+          if (!audioEl) {
+            audioEl = new Audio(clip.src);
+            activeAudios.current.set(clip.id, audioEl);
+          }
+          if (audioEl.paused) {
+            audioEl.currentTime = currentTime - clip.startTime;
+            audioEl.play().catch(e => console.log('Audio play blocked:', e));
+          }
+        } else {
+          if (audioEl && !audioEl.paused) {
+            audioEl.pause();
+          }
+        }
+      });
+    });
+    
+    if (!isPlaying) {
+      activeAudios.current.forEach(audio => audio.pause());
+    }
+
     return () => clearInterval(interval);
-  }, [isPlaying, duration, setCurrentTime, togglePlay]);
+  }, [isPlaying, currentTime, duration, setCurrentTime, togglePlay, tracks]);
 
   // Canvas render
   useEffect(() => {
@@ -137,13 +172,23 @@ export default function Editor() {
             ctx.textAlign = 'center';
             ctx.fillText(clip.sticker, (clip.x / 100) * canvas.width, (clip.y / 100) * canvas.height);
           } else if (clip.type === TRACK_TYPES.VIDEO && clip.src) {
-            // Would render video frame here
-            ctx.fillStyle = '#8b5cf6';
+            // Preview video placeholder with real CSS filters
+            ctx.filter = clip.filter || 'none';
+            ctx.fillStyle = '#1e1e2d';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a generic shape to see filter effects
+            ctx.fillStyle = '#8b5cf6';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, 100, 0, Math.PI * 2);
+            ctx.fill();
+            
             ctx.fillStyle = '#fff';
-            ctx.font = '20px Inter';
+            ctx.font = 'bold 24px Inter';
             ctx.textAlign = 'center';
-            ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2);
+            ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 - 120);
+            
+            ctx.filter = 'none'; // reset filter for other elements
           }
         }
       });
@@ -313,10 +358,18 @@ export default function Editor() {
               <div>
                 <input type="file" ref={fileInputRef} accept="video/*,audio/*,image/*" multiple hidden
                   onChange={handleFileUpload} />
-                <button className="media-upload-zone" onClick={() => fileInputRef.current?.click()}>
+                <button className="media-upload-zone" onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const dt = new DataTransfer();
+                    for (let file of e.dataTransfer.files) dt.items.add(file);
+                    handleFileUpload({ target: { files: dt.files } });
+                  }}>
                   {I.upload}
                   <p>Fayllarni yuklash</p>
-                  <span>Video, rasm yoki audio (lokal)</span>
+                  <span>Video, rasm yoki audio tashlang yoki bosing</span>
                 </button>
                 {mediaFiles.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)', fontSize: '12px' }}>
@@ -455,11 +508,15 @@ export default function Editor() {
                   ))}
                 </div>
                 <div className="effects-grid">
-                  {(EFFECT_CATEGORIES[effectCategory].effects || EFFECT_CATEGORIES[effectCategory].items?.map((name, i) => ({
-                    id: name.toLowerCase().replace(/\s/g, '-'),
-                    name, icon: null, filter: 'none'
-                  })) || []).map((effect, i) => (
-                    <button key={i} className="effect-item">
+                  {(EFFECT_CATEGORIES[effectCategory].effects || []).map((effect, i) => (
+                    <button key={i} className="effect-item" onClick={() => {
+                      if (selectedClipId) {
+                        const trackId = tracks.find(t => t.clips.find(c => c.id === selectedClipId))?.id;
+                        if (trackId) updateClip(trackId, selectedClipId, { filter: effect.filter });
+                      } else {
+                        alert("Iltimos, avval timeline dan video clipni tanlang.");
+                      }
+                    }}>
                       {effect.icon && <div className="effect-icon">{effect.icon}</div>}
                       <div className="effect-name">{effect.name}</div>
                     </button>

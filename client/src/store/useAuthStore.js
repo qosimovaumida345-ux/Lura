@@ -7,17 +7,10 @@ export const useAuthStore = create((set) => ({
 
   setUser: (user) => set({ user, isAuthenticated: !!user, isLoading: false }),
 
-  // Demo login (no real OAuth needed for MVP)
-  loginDemo: () => {
-    const demoUser = {
-      id: 1,
-      display_name: 'Lura User',
-      email: 'user@lura.app',
-      avatar_url: null,
-    };
-    localStorage.setItem('lura_token', 'demo_token');
-    localStorage.setItem('lura_user', JSON.stringify(demoUser));
-    set({ user: demoUser, isAuthenticated: true, isLoading: false });
+  loginWithToken: (token, user) => {
+    localStorage.setItem('lura_token', token);
+    localStorage.setItem('lura_user', JSON.stringify(user));
+    set({ user, isAuthenticated: true, isLoading: false });
   },
 
   // Load from localStorage

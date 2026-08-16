@@ -23,25 +23,36 @@ export const ASPECT_RATIOS = {
   '4:5': { width: 1080, height: 1350 },
 };
 
-/* ---- Effects List ---- */
-export const VIDEO_EFFECTS = [
-  { id: 'none', name: 'Original', icon: '🎬', filter: 'none' },
-  { id: 'grayscale', name: 'Grayscale', icon: '⬛', filter: 'grayscale(100%)' },
-  { id: 'sepia', name: 'Sepia', icon: '🟤', filter: 'sepia(80%)' },
-  { id: 'vintage', name: 'Vintage', icon: '📷', filter: 'sepia(40%) contrast(1.1) brightness(0.9) saturate(0.8)' },
-  { id: 'warm', name: 'Warm', icon: '🔥', filter: 'saturate(1.4) brightness(1.05) hue-rotate(-10deg)' },
-  { id: 'cool', name: 'Cool', icon: '❄️', filter: 'saturate(0.9) brightness(1.05) hue-rotate(15deg)' },
-  { id: 'vibrant', name: 'Vibrant', icon: '🌈', filter: 'saturate(1.8) contrast(1.1)' },
-  { id: 'dramatic', name: 'Dramatic', icon: '🎭', filter: 'contrast(1.4) brightness(0.85) saturate(1.2)' },
-  { id: 'noir', name: 'Noir', icon: '🖤', filter: 'grayscale(100%) contrast(1.3) brightness(0.9)' },
-  { id: 'bright', name: 'Bright', icon: '☀️', filter: 'brightness(1.3) saturate(1.1)' },
-  { id: 'fade', name: 'Fade', icon: '🌫️', filter: 'contrast(0.8) brightness(1.15) saturate(0.7)' },
-  { id: 'blur-light', name: 'Soft Blur', icon: '💫', filter: 'blur(1px) brightness(1.05)' },
-  { id: 'invert', name: 'Invert', icon: '🔄', filter: 'invert(100%)' },
-  { id: 'hue-shift', name: 'Hue Shift', icon: '🎨', filter: 'hue-rotate(90deg)' },
-  { id: 'contrast-high', name: 'High Contrast', icon: '⚡', filter: 'contrast(1.6) saturate(1.2)' },
-  { id: 'dreamy', name: 'Dreamy', icon: '✨', filter: 'blur(0.5px) brightness(1.15) saturate(1.3) contrast(0.9)' },
-];
+/* ---- Effects Generator ---- */
+const generateEffects = () => {
+  const effects = [{ id: 'none', name: 'Original', icon: '🎬', filter: 'none' }];
+  const hues = [0, 45, 90, 135, 180, 225, 270, 315];
+  const saturations = [0, 0.5, 1, 1.5, 2, 3];
+  const contrasts = [0.5, 0.8, 1, 1.2, 1.5, 2];
+  const brightnesses = [0.5, 0.8, 1, 1.2, 1.5];
+  
+  let count = 1;
+  for (let h of hues) {
+    for (let s of saturations) {
+      for (let c of contrasts) {
+        for (let b of brightnesses) {
+          if (count > 500) break; // Limit to 500 so UI doesn't crash
+          if (h===0 && s===1 && c===1 && b===1) continue;
+          effects.push({
+            id: `effect-${count}`,
+            name: `Filter #${count}`,
+            icon: '✨',
+            filter: `hue-rotate(${h}deg) saturate(${s}) contrast(${c}) brightness(${b})`
+          });
+          count++;
+        }
+      }
+    }
+  }
+  return effects;
+};
+
+export const VIDEO_EFFECTS = generateEffects();
 
 /* ---- Transitions ---- */
 export const TRANSITIONS = [
