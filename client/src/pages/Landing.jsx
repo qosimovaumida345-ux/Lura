@@ -84,6 +84,7 @@ export default function Landing() {
           <a href="#features">Imkoniyatlar</a>
           <a href="#ai">LuraAI</a>
           <a href="#download">Yuklab olish</a>
+          <button className="btn btn-primary" style={{ marginLeft: '12px' }} onClick={() => navigate('/login')}>Tizimga kirish</button>
         </div>
       </nav>
 
