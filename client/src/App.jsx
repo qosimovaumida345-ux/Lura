@@ -21,23 +21,27 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function PublicHomeRoute() {
+  const { isAuthenticated } = useAuthStore();
+  const isNativeApp = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNativePlatform());
+
+  if (isNativeApp) {
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+  }
+
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Landing />;
+}
+
 export default function App() {
   const { loadUser } = useAuthStore();
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadUser();
-    
-    // Native app redirection (Tauri/Capacitor)
-    const isNativeApp = window.__TAURI__ || window.Capacitor?.isNativePlatform();
-    if (isNativeApp && window.location.pathname === '/') {
-      navigate('/login', { replace: true });
-    }
-  }, [loadUser, navigate]);
+  }, [loadUser]);
 
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={<PublicHomeRoute />} />
       <Route path="/login" element={<Login />} />
       
       {/* Protected Routes */}

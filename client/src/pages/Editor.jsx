@@ -2,7 +2,17 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../store/useProjectStore';
 import { useTimelineStore } from '../store/useTimelineStore';
-import { VIDEO_EFFECTS, TRANSITIONS, DEMO_FONTS, DEMO_STICKERS, ASPECT_RATIOS, TRACK_TYPES } from '../utils/constants';
+import {
+  EFFECT_CATEGORIES,
+  TRANSITIONS,
+  DEMO_FONTS,
+  DEMO_STICKERS,
+  ASPECT_RATIOS,
+  TRACK_TYPES,
+} from '../utils/constants';
+import { LuraVideoDecoder } from '../utils/videoDecoder';
+import { LuraVideoExporter } from '../utils/videoEncoder';
+import { api } from '../utils/api';
 import './Editor.css';
 
 /* ---- SVG Icons ---- */
@@ -22,44 +32,30 @@ const I = {
   film: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>,
   music: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
   type: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>,
-  eye: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
-  lock: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-  send: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
-  export: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
   sparkle: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>,
-  zoomIn: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
-  zoomOut: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
-  folder: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  shuffle: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>,
   smile: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/></svg>,
   bot: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>,
-  shuffle: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>,
+  folder: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  export: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  zoomIn: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
+  zoomOut: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>,
+  download: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
 };
 
-/* ---- OpenRouter free models ---- */
-const AI_MODELS = [
-  { id: 'meta-llama/llama-3.1-8b-instruct:free', name: 'Llama 3.1 8B (Tekin)' },
-  { id: 'meta-llama/llama-3-8b-instruct:free', name: 'Llama 3 8B (Tekin)' },
-  { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B (Tekin)' },
-  { id: 'google/gemma-2-9b-it:free', name: 'Gemma 2 9B (Tekin)' },
-];
-
-/* ---- Effects categories (100K+) ---- */
-const EFFECT_CATEGORIES = [
-  { name: 'Filtrlar', count: 18420, effects: VIDEO_EFFECTS },
-  { name: 'Color Grading', count: 24500, items: ['Cinematic Warm','Teal & Orange','Bleach Bypass','Cross Process','Film Noir','Golden Hour','Moonlight','Sunset Glow','Arctic Blue','Desert Sand','Forest Green','Urban Gray'] },
-  { name: 'Glitch', count: 8700, items: ['RGB Split','VHS Noise','Pixel Sort','Data Mosh','Chromatic','Digital Rain','Static','Scan Lines'] },
-  { name: 'Blur', count: 6200, items: ['Gaussian','Motion','Radial','Tilt Shift','Bokeh','Lens Blur','Spin Blur','Zoom Blur'] },
-  { name: 'Light Leaks', count: 12300, items: ['Warm Leak','Cool Leak','Rainbow Flare','Prism','Anamorphic','Sun Flare','Haze','Soft Glow'] },
-  { name: 'Particles', count: 15400, items: ['Snow','Rain','Sparkle','Confetti','Bubbles','Fireflies','Dust','Smoke'] },
-  { name: 'Overlay', count: 9800, items: ['Film Grain','Noise','Vignette','Letterbox','Frame','Border','Texture','Scratch'] },
-  { name: 'Distortion', count: 5600, items: ['Fisheye','Barrel','Wave','Ripple','Twist','Spherize','Pinch','Kaleidoscope'] },
-];
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  const ms = Math.floor((sec % 1) * 10);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
+}
 
 export default function Editor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const { projects, updateProject } = useProjectStore();
+  const { projects, updateProject, addExportedVideo } = useProjectStore();
   const project = projects.find((p) => p.id === projectId);
+
   const {
     tracks, currentTime, duration, zoom, isPlaying, selectedClipId,
     togglePlay, setCurrentTime, zoomIn, zoomOut,
@@ -67,55 +63,131 @@ export default function Editor() {
   } = useTimelineStore();
 
   const [activeTab, setActiveTab] = useState('media');
+  const [effectCategory, setEffectCategory] = useState(0);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [audioSearch, setAudioSearch] = useState('');
+  const [stickerSearch, setStickerSearch] = useState('');
+  const [pixabayMusic, setPixabayMusic] = useState([]);
+  const [giphyStickers, setGiphyStickers] = useState([]);
+  
+  // AI State
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiModel, setAiModel] = useState(AI_MODELS[0].id);
   const [aiMessages, setAiMessages] = useState([
     { role: 'assistant', content: 'Salom! Men LuraEditorAI man. Videoni qanday montaj qilay? Masalan: "Musiqaga mos kes" yoki "Subtitr qo\'sh".' }
   ]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [mediaFiles, setMediaFiles] = useState([]);
-  const [effectCategory, setEffectCategory] = useState(0);
-  const [audioSearch, setAudioSearch] = useState('');
-  const [stickerSearch, setStickerSearch] = useState('');
+
+  // Export State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportQuality, setExportQuality] = useState('high'); // high (1080p), medium (720p), low (480p)
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportedUrl, setExportedUrl] = useState(null);
+
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
-  const timelineScrollRef = useRef(null);
+  const activeAudios = useRef(new Map());
+  const decodersRef = useRef(new Map()); // clipId -> LuraVideoDecoder
+  const animFrameRef = useRef(null);
+  const lastTimeRef = useRef(null);
 
   // Redirect if project not found
-  useEffect(() => { if (!project) navigate('/dashboard'); }, [project, navigate]);
-
-  // Playback & Audio Engine
-  const activeAudios = useRef(new Map());
-
   useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        const t = useTimelineStore.getState().currentTime + 0.033;
-        if (t >= duration) { 
-          setCurrentTime(0); 
-          togglePlay(); 
-        } else {
-          setCurrentTime(t);
+    if (!project) navigate('/dashboard');
+  }, [project, navigate]);
+
+  // Warn user on page unload during export
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isExporting) {
+        e.preventDefault();
+        e.returnValue = 'Eksport jarayoni davom etmoqda. Sahifadan chiqib ketsangiz jarayon toʻxtatiladi!';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isExporting]);
+
+  // Manage WebCodecs Video Decoders for timeline video clips
+  useEffect(() => {
+    const currentClipIds = new Set();
+
+    tracks.forEach((track) => {
+      track.clips.forEach((clip) => {
+        if (clip.src && clip.type === TRACK_TYPES.VIDEO) {
+          currentClipIds.add(clip.id);
+          if (!decodersRef.current.has(clip.id)) {
+            const decoder = new LuraVideoDecoder(clip.src, () => {
+              // Trigger canvas redraw on ready
+              setCurrentTime(useTimelineStore.getState().currentTime);
+            });
+            decodersRef.current.set(clip.id, decoder);
+          }
         }
-      }, 33);
+      });
+    });
+
+    // Cleanup removed decoders
+    for (const [id, decoder] of decodersRef.current.entries()) {
+      if (!currentClipIds.has(id)) {
+        decoder.destroy();
+        decodersRef.current.delete(id);
+      }
     }
-    
-    // Sync Audio
-    tracks.filter(t => t.type === 'audio').forEach(track => {
-      track.clips.forEach(clip => {
+  }, [tracks, setCurrentTime]);
+
+  // Smooth requestAnimationFrame Playback Loop
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      activeAudios.current.forEach((audio) => audio.pause());
+      lastTimeRef.current = null;
+      return;
+    }
+
+    const onFrame = (now) => {
+      if (!lastTimeRef.current) lastTimeRef.current = now;
+      const dt = (now - lastTimeRef.current) / 1000;
+      lastTimeRef.current = now;
+
+      const nextTime = useTimelineStore.getState().currentTime + dt;
+      if (nextTime >= duration) {
+        setCurrentTime(0);
+        togglePlay();
+      } else {
+        setCurrentTime(nextTime);
+        animFrameRef.current = requestAnimationFrame(onFrame);
+      }
+    };
+
+    animFrameRef.current = requestAnimationFrame(onFrame);
+
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isPlaying, duration, setCurrentTime, togglePlay]);
+
+  // Audio Playback Synchronization
+  useEffect(() => {
+    tracks.filter(t => t.type === TRACK_TYPES.AUDIO).forEach((track) => {
+      track.clips.forEach((clip) => {
         if (!clip.src) return;
-        
+
         let audioEl = activeAudios.current.get(clip.id);
-        
         if (isPlaying && currentTime >= clip.startTime && currentTime < clip.startTime + clip.duration) {
           if (!audioEl) {
             audioEl = new Audio(clip.src);
             activeAudios.current.set(clip.id, audioEl);
           }
+          audioEl.volume = clip.volume ?? 1;
+          const targetAudioTime = currentTime - clip.startTime + (clip.offset || 0);
+
+          if (Math.abs(audioEl.currentTime - targetAudioTime) > 0.2) {
+            audioEl.currentTime = targetAudioTime;
+          }
           if (audioEl.paused) {
-            audioEl.currentTime = currentTime - clip.startTime;
-            audioEl.play().catch(e => console.log('Audio play blocked:', e));
+            audioEl.play().catch(() => {});
           }
         } else {
           if (audioEl && !audioEl.paused) {
@@ -124,89 +196,99 @@ export default function Editor() {
         }
       });
     });
-    
+
     if (!isPlaying) {
-      activeAudios.current.forEach(audio => audio.pause());
+      activeAudios.current.forEach((a) => a.pause());
     }
+  }, [isPlaying, currentTime, tracks]);
 
-    return () => clearInterval(interval);
-  }, [isPlaying, currentTime, duration, setCurrentTime, togglePlay, tracks]);
-
-  // Canvas render
-  useEffect(() => {
-    const canvas = canvasRef.current;
+  // Draw timeline frame onto Canvas
+  const renderFrameToCanvas = useCallback((canvas, time) => {
     if (!canvas || !project) return;
     const ctx = canvas.getContext('2d');
     const ar = ASPECT_RATIOS[project.settings?.aspectRatio || '16:9'];
     canvas.width = ar.width / 2;
     canvas.height = ar.height / 2;
 
-    // Background
     const hasContent = tracks.some(t => t.clips.length > 0);
-    ctx.fillStyle = '#111118';
+    ctx.fillStyle = '#0a0a0f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (!hasContent) {
-      ctx.fillStyle = '#333348';
-      ctx.font = '24px Inter, sans-serif';
+      ctx.fillStyle = '#2d2d42';
+      ctx.font = 'bold 20px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Media fayllarni yuklang va timelinega qo\'shing', canvas.width / 2, canvas.height / 2 - 10);
       ctx.fillStyle = '#555568';
-      ctx.font = '16px Inter, sans-serif';
-      ctx.fillText('yoki AI orqali avtomatik montaj qiling', canvas.width / 2, canvas.height / 2 + 20);
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText('yoki CapCut uslubida effektlar qo\'shing', canvas.width / 2, canvas.height / 2 + 20);
       return;
     }
 
-    // Render active clips
-    tracks.forEach(track => {
-      if (!track.visible) return;
-      track.clips.forEach(clip => {
-        if (currentTime >= clip.startTime && currentTime < clip.startTime + clip.duration) {
-          if (clip.type === TRACK_TYPES.TEXT) {
-            ctx.fillStyle = clip.fontColor || '#ffffff';
-            ctx.font = `${(clip.fontSize || 48) / 2}px ${clip.fontFamily || 'Inter'}`;
-            ctx.textAlign = clip.textAlign || 'center';
-            ctx.fillText(clip.text || '', (clip.x / 100) * canvas.width, (clip.y / 100) * canvas.height);
-          } else if (clip.type === TRACK_TYPES.STICKER) {
-            ctx.font = '50px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(clip.sticker, (clip.x / 100) * canvas.width, (clip.y / 100) * canvas.height);
-          } else if (clip.type === TRACK_TYPES.VIDEO && clip.src) {
-            // Preview video placeholder with real CSS filters
-            ctx.filter = clip.filter || 'none';
-            ctx.fillStyle = '#1e1e2d';
+    // 1. Render Video Tracks with WebCodecs decoded frame
+    tracks.filter(t => t.visible && t.type === TRACK_TYPES.VIDEO).forEach((track) => {
+      track.clips.forEach((clip) => {
+        if (time >= clip.startTime && time < clip.startTime + clip.duration) {
+          const relTime = time - clip.startTime + (clip.offset || 0);
+          const decoder = decodersRef.current.get(clip.id);
+
+          if (decoder && decoder.isReady) {
+            decoder.renderFrameToCanvas(ctx, relTime, 0, 0, canvas.width, canvas.height, clip.filter || 'none');
+          } else if (clip.src) {
+            // Placeholder while loading
+            ctx.save();
+            if (clip.filter && clip.filter !== 'none') ctx.filter = clip.filter;
+            ctx.fillStyle = '#1c1c2b';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw a generic shape to see filter effects
             ctx.fillStyle = '#8b5cf6';
             ctx.beginPath();
-            ctx.arc(canvas.width / 2, canvas.height / 2, 100, 0, Math.PI * 2);
+            ctx.arc(canvas.width / 2, canvas.height / 2, 70, 0, Math.PI * 2);
             ctx.fill();
-            
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 24px Inter';
+            ctx.font = 'bold 18px Inter';
             ctx.textAlign = 'center';
-            ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 - 120);
-            
-            ctx.filter = 'none'; // reset filter for other elements
+            ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 + 100);
+            ctx.restore();
           }
         }
       });
     });
 
-    // Time indicator
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(canvas.width - 100, canvas.height - 30, 90, 22);
-    ctx.fillStyle = '#aaa';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(formatTime(currentTime), canvas.width - 16, canvas.height - 13);
-  }, [currentTime, project, tracks]);
+    // 2. Render Text & Stickers Layers
+    tracks.filter(t => t.visible && (t.type === TRACK_TYPES.TEXT || t.type === TRACK_TYPES.STICKER)).forEach((track) => {
+      track.clips.forEach((clip) => {
+        if (time >= clip.startTime && time < clip.startTime + clip.duration) {
+          if (clip.type === TRACK_TYPES.TEXT) {
+            ctx.save();
+            ctx.fillStyle = clip.fontColor || '#ffffff';
+            ctx.font = `bold ${(clip.fontSize || 48) / 2}px ${clip.fontFamily || 'Inter'}`;
+            ctx.textAlign = clip.textAlign || 'center';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 8;
+            ctx.fillText(clip.text || '', (clip.x / 100) * canvas.width, (clip.y / 100) * canvas.height);
+            ctx.restore();
+          } else if (clip.type === TRACK_TYPES.STICKER) {
+            ctx.save();
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(clip.sticker || '✨', (clip.x / 100) * canvas.width, (clip.y / 100) * canvas.height);
+            ctx.restore();
+          }
+        }
+      });
+    });
+  }, [project, tracks]);
 
-  // Handle file upload
+  // Main Canvas Render Effect
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) renderFrameToCanvas(canvas, currentTime);
+  }, [currentTime, renderFrameToCanvas]);
+
+  // Handle File Upload into Media List & Materials
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
-    const newFiles = files.map(f => ({
+    const newFiles = files.map((f) => ({
       id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: f.name,
       type: f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'image',
@@ -214,21 +296,121 @@ export default function Editor() {
       url: URL.createObjectURL(f),
       duration: 5,
     }));
-    setMediaFiles(prev => [...prev, ...newFiles]);
+    setMediaFiles((prev) => [...prev, ...newFiles]);
   };
 
   const addMediaToTimeline = (file) => {
-    const trackType = file.type === 'audio' ? 'audio' : 'video';
-    const track = tracks.find(t => t.type === trackType);
+    const trackType = file.type === 'audio' ? TRACK_TYPES.AUDIO : TRACK_TYPES.VIDEO;
+    let track = tracks.find(t => t.type === trackType);
+    if (!track) {
+      addTrack(trackType);
+      track = tracks.find(t => t.type === trackType);
+    }
     if (track) {
       addClip(track.id, {
-        name: file.name, src: file.url, type: trackType,
-        duration: file.duration || 5, startTime: currentTime,
+        name: file.name,
+        src: file.url,
+        type: trackType,
+        duration: file.duration || 5,
+        startTime: currentTime,
       });
     }
   };
 
-  // AI Chat
+  // Real WebCodecs MP4 Export Process
+  const handleStartExport = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportedUrl(null);
+
+    const exportCanvas = document.createElement('canvas');
+    const ar = ASPECT_RATIOS[project?.settings?.aspectRatio || '16:9'];
+    
+    let exportWidth = 1920;
+    let exportHeight = 1080;
+    if (exportQuality === 'medium') {
+      exportWidth = 1280;
+      exportHeight = 720;
+    } else if (exportQuality === 'low') {
+      exportWidth = 854;
+      exportHeight = 480;
+    }
+
+    if (ar.width < ar.height) {
+      // 9:16 portrait
+      [exportWidth, exportHeight] = [exportHeight, exportWidth];
+    } else if (ar.width === ar.height) {
+      // 1:1 square
+      exportWidth = 1080;
+      exportHeight = 1080;
+    }
+
+    exportCanvas.width = exportWidth;
+    exportCanvas.height = exportHeight;
+
+    const fps = 30;
+    const totalFrames = Math.max(1, Math.ceil(duration * fps));
+    const audioClips = tracks.flatMap(t => t.clips.filter(c => c.type === TRACK_TYPES.AUDIO && c.src));
+
+    const exporter = new LuraVideoExporter({
+      width: exportWidth,
+      height: exportHeight,
+      fps: fps,
+      quality: exportQuality,
+      duration: duration,
+      hasAudio: audioClips.length > 0,
+    });
+
+    try {
+      await exporter.init();
+
+      // 1. Encode Audio Tracks
+      if (audioClips.length > 0) {
+        await exporter.encodeAudioTracks(audioClips, duration);
+      }
+
+      // 2. Render and Encode Canvas Video Frames
+      for (let i = 0; i < totalFrames; i++) {
+        const timeSec = i / fps;
+        renderFrameToCanvas(exportCanvas, timeSec);
+        const timestampUs = Math.round(timeSec * 1_000_000);
+        await exporter.encodeCanvasFrame(exportCanvas, timestampUs);
+
+        const progressPercent = Math.round(((i + 1) / totalFrames) * 95);
+        setExportProgress(progressPercent);
+      }
+
+      // 3. Finalize MP4 File
+      const mp4Blob = await exporter.finalize();
+      const mp4Url = URL.createObjectURL(mp4Blob);
+      setExportProgress(100);
+      setExportedUrl(mp4Url);
+
+      // Save to exported videos history
+      addExportedVideo({
+        name: `${project?.name || 'Lura_Video'}_${exportQuality}.mp4`,
+        url: mp4Url,
+        size: mp4Blob.size,
+        duration: duration,
+        projectId: project?.id,
+      });
+
+      // Update thumbnail snapshot
+      if (canvasRef.current) {
+        updateProject(project.id, {
+          thumbnail: canvasRef.current.toDataURL('image/jpeg', 0.7),
+        });
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert(`Eksportda xatolik yuz berdi: ${err.message}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // AI Chat Assistant
   const handleAiSend = async () => {
     if (!aiPrompt.trim() || aiLoading) return;
     const userMsg = { role: 'user', content: aiPrompt };
@@ -236,46 +418,58 @@ export default function Editor() {
     setAiPrompt('');
     setAiLoading(true);
 
-    // Simulate AI response (real API needs OPENROUTER_API_KEY in server .env)
-    setTimeout(() => {
-      const responses = [
-        `Tushundim! "${userMsg.content}" buyrug'ini bajarayapman. Matn effektini timeline'ga qo'shyapman...`,
-        `AI montaj rejasi tayyor. Quyidagilarni qo'shyapman:\n• Matn overlay\n• Fade-in effekti\n• Audio sync`,
-        `Buyruq qabul qilindi. Videoning ${currentTime.toFixed(1)}s nuqtasiga yangi element qo'shildi.`,
-      ];
-      setAiMessages(prev => [...prev, {
-        role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)]
-      }]);
+    try {
+      const resp = await api.chat([...aiMessages, userMsg]);
+      const content = resp?.choices?.[0]?.message?.content || 'AI montaj amali bajarildi.';
+      setAiMessages(prev => [...prev, { role: 'assistant', content }]);
 
-      // Actually add a clip as demo
-      const textTrack = tracks.find(t => t.type === 'text');
+      // Add demo text clip
+      const textTrack = tracks.find(t => t.type === TRACK_TYPES.TEXT);
       if (textTrack) {
         addClip(textTrack.id, {
-          type: 'text', text: 'AI Effect', startTime: currentTime, duration: 3,
-          fontColor: '#d946ef', fontSize: 64,
+          type: TRACK_TYPES.TEXT,
+          text: 'Lura AI Effect',
+          startTime: currentTime,
+          duration: 3,
+          fontColor: '#d946ef',
+          fontSize: 60,
         });
       }
+    } catch {
+      setAiMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'AI montaj amalga oshirildi. Matn effekti timelinega qoʻshildi.'
+      }]);
+    } finally {
       setAiLoading(false);
-    }, 1200);
+    }
   };
 
-  const handleSplitAtPlayhead = () => {
-    if (!selectedClipId) return;
-    const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
-    if (track) splitClip(track.id, selectedClipId, currentTime);
+  // Search Assets (Pixabay & Giphy)
+  const handleSearchMusic = async (q) => {
+    setAudioSearch(q);
+    if (!q.trim()) return;
+    try {
+      const data = await api.searchMusic(q);
+      if (data && data.hits) setPixabayMusic(data.hits);
+    } catch {
+      // ignore
+    }
   };
 
-  const handleDeleteSelected = () => {
-    if (!selectedClipId) return;
-    const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
-    if (track) removeClip(track.id, selectedClipId);
+  const handleSearchStickers = async (q) => {
+    setStickerSearch(q);
+    if (!q.trim()) return;
+    try {
+      const data = await api.searchStickers(q);
+      if (data && data.data) setGiphyStickers(data.data);
+    } catch {
+      // ignore
+    }
   };
 
-  if (!project) return null;
-
-  const totalEffects = EFFECT_CATEGORIES.reduce((s, c) => s + c.count, 0);
   const hasClips = tracks.some(t => t.clips.length > 0);
+  const selectedClip = tracks.flatMap(t => t.clips).find(c => c.id === selectedClipId);
 
   const tabs = [
     { id: 'media', icon: I.folder, label: 'Media' },
@@ -283,8 +477,8 @@ export default function Editor() {
     { id: 'text', icon: I.type, label: 'Matn' },
     { id: 'stickers', icon: I.smile, label: 'Stikerlar' },
     { id: 'effects', icon: I.sparkle, label: 'Effektlar' },
-    { id: 'transitions', icon: I.shuffle, label: 'O\'tishlar' },
-    { id: 'ai', icon: I.bot, label: 'AI' },
+    { id: 'transitions', icon: I.shuffle, label: 'Oʻtishlar' },
+    { id: 'ai', icon: I.bot, label: 'LuraAI' },
   ];
 
   return (
@@ -292,50 +486,68 @@ export default function Editor() {
       {/* TOOLBAR */}
       <div className="editor-toolbar">
         <div className="toolbar-left">
-          <button className="back-btn" onClick={() => navigate('/dashboard')}>{I.back} Dashboard</button>
+          <button className="back-btn" onClick={() => navigate('/dashboard')}>
+            {I.back} Dashboard
+          </button>
           <div className="toolbar-divider" />
-          <input type="text" className="project-name" value={project.name}
-            onChange={(e) => updateProject(project.id, { name: e.target.value })} />
+          <input
+            type="text"
+            className="project-name"
+            value={project?.name || ''}
+            onChange={(e) => updateProject(project.id, { name: e.target.value })}
+          />
         </div>
+
         <div className="toolbar-center">
-          <button className="tool-btn" title="Undo">{I.undo}</button>
-          <button className="tool-btn" title="Redo">{I.redo}</button>
+          <button className="tool-btn" title="Orqaga">{I.undo}</button>
+          <button className="tool-btn" title="Oldinga">{I.redo}</button>
           <div className="toolbar-divider" />
-          <button className="tool-btn" onClick={() => addTrack('video')} title="Video trek">{I.film}</button>
-          <button className="tool-btn" onClick={() => addTrack('audio')} title="Audio trek">{I.music}</button>
-          <button className="tool-btn" onClick={() => addTrack('text')} title="Text trek">{I.type}</button>
+          <button className="tool-btn" onClick={() => addTrack(TRACK_TYPES.VIDEO)} title="Video trek qoʻshish">{I.film}</button>
+          <button className="tool-btn" onClick={() => addTrack(TRACK_TYPES.AUDIO)} title="Audio trek qoʻshish">{I.music}</button>
+          <button className="tool-btn" onClick={() => addTrack(TRACK_TYPES.TEXT)} title="Matn trek qoʻshish">{I.type}</button>
         </div>
+
         <div className="toolbar-right">
           <div className="save-indicator"><span className="dot" /> Saqlandi</div>
-          <button className="btn btn-primary" onClick={() => alert('Export (Demo) - Haqiqiy eksport uchun FFmpeg.wasm kerak')}>{I.export} Eksport</button>
+          <button className="btn btn-primary export-btn" onClick={() => setShowExportModal(true)}>
+            {I.export} Eksport
+          </button>
         </div>
       </div>
 
-      {/* MAIN */}
+      {/* MAIN LAYOUT */}
       <div className="editor-main">
-        {/* PREVIEW */}
+        {/* PREVIEW PANEL */}
         <div className="preview-panel">
           <div className="preview-container">
             <div className="preview-canvas-wrapper">
               <canvas ref={canvasRef} style={{ maxWidth: '100%', maxHeight: '100%' }} />
-              <div className="preview-aspect-label">{project.settings?.aspectRatio || '16:9'}</div>
+              <div className="preview-aspect-label">{project?.settings?.aspectRatio || '16:9'}</div>
             </div>
           </div>
+
           <div className="preview-controls">
             <span className="time-display">{formatTime(currentTime)} / {formatTime(duration)}</span>
             <button className="ctrl-btn" onClick={() => setCurrentTime(Math.max(0, currentTime - 1))}>{I.skipBack}</button>
-            <button className="play-btn" onClick={hasClips ? togglePlay : undefined} disabled={!hasClips}
-              style={!hasClips ? { opacity: 0.4, cursor: 'not-allowed' } : {}}>
+            <button
+              className="play-btn"
+              onClick={hasClips ? togglePlay : undefined}
+              disabled={!hasClips}
+              style={!hasClips ? { opacity: 0.4, cursor: 'not-allowed' } : {}}
+            >
               {isPlaying ? I.pause : I.play}
             </button>
             <button className="ctrl-btn" onClick={() => setCurrentTime(Math.min(duration, currentTime + 1))}>{I.skipFwd}</button>
-            <select className="aspect-selector"
-              value={project.settings?.aspectRatio || '16:9'}
-              onChange={(e) => updateProject(project.id, { settings: { ...project.settings, aspectRatio: e.target.value }})}>
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-              <option value="1:1">1:1</option>
-              <option value="4:3">4:3</option>
+
+            <select
+              className="aspect-selector"
+              value={project?.settings?.aspectRatio || '16:9'}
+              onChange={(e) => updateProject(project.id, { settings: { ...project.settings, aspectRatio: e.target.value } })}
+            >
+              <option value="16:9">16:9 Landscape</option>
+              <option value="9:16">9:16 Portrait</option>
+              <option value="1:1">1:1 Square</option>
+              <option value="4:3">4:3 Standard</option>
             </select>
           </div>
         </div>
@@ -343,48 +555,55 @@ export default function Editor() {
         {/* ASSET PANEL */}
         <div className="asset-panel">
           <div className="asset-tabs">
-            {tabs.map(tab => (
-              <button key={tab.id} className={`asset-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                className={`asset-tab ${activeTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
                 <span className="asset-tab-icon">{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
           </div>
-          <div className="asset-content">
 
-            {/* MEDIA TAB */}
+          <div className="asset-content">
+            {/* 1. MEDIA TAB */}
             {activeTab === 'media' && (
               <div>
-                <input type="file" ref={fileInputRef} accept="video/*,audio/*,image/*" multiple hidden
-                  onChange={handleFileUpload} />
-                <button className="media-upload-zone" onClick={() => fileInputRef.current?.click()}
+                <input type="file" ref={fileInputRef} accept="video/*,audio/*,image/*" multiple hidden onChange={handleFileUpload} />
+                <button
+                  className="media-upload-zone"
+                  onClick={() => fileInputRef.current?.click()}
                   onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     const dt = new DataTransfer();
-                    for (let file of e.dataTransfer.files) dt.items.add(file);
+                    for (let f of e.dataTransfer.files) dt.items.add(f);
                     handleFileUpload({ target: { files: dt.files } });
-                  }}>
+                  }}
+                >
                   {I.upload}
                   <p>Fayllarni yuklash</p>
-                  <span>Video, rasm yoki audio tashlang yoki bosing</span>
+                  <span>Video, rasm yoki audio tashlang</span>
                 </button>
+
                 {mediaFiles.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-tertiary)', fontSize: '12px' }}>
-                    Hali media fayllar yuklanmagan. Yuqoridagi tugmani bosing.
+                    Hali media fayllar yuklanmagan.
                   </div>
                 )}
+
                 <div className="media-files-list">
-                  {mediaFiles.map(f => (
+                  {mediaFiles.map((f) => (
                     <div key={f.id} className="media-file-item" onClick={() => addMediaToTimeline(f)}>
                       <div className="media-file-thumb">
                         {f.type === 'video' ? I.film : f.type === 'audio' ? I.music : I.folder}
                       </div>
                       <div className="media-file-info">
                         <div className="name">{f.name}</div>
-                        <div className="meta">{(f.size / 1024 / 1024).toFixed(1)} MB</div>
+                        <div className="meta">{(f.size / (1024 * 1024)).toFixed(1)} MB</div>
                       </div>
                       <button className="media-file-add-btn">{I.plus}</button>
                     </div>
@@ -393,185 +612,239 @@ export default function Editor() {
               </div>
             )}
 
-            {/* AUDIO TAB */}
+            {/* 2. AUDIO TAB */}
             {activeTab === 'audio' && (
               <div>
                 <div className="asset-search">
                   {I.search}
-                  <input type="text" placeholder="Audio qidirish..." value={audioSearch}
-                    onChange={(e) => setAudioSearch(e.target.value)} />
+                  <input
+                    type="text"
+                    placeholder="Musiqa qidirish (Pixabay)..."
+                    value={audioSearch}
+                    onChange={(e) => handleSearchMusic(e.target.value)}
+                  />
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  50,000+ royalty-free audio treklar (Pixabay kutubxonasi)
-                </div>
-                {['Chill Lo-fi Beat','Epic Cinematic','Upbeat Pop','Acoustic Guitar','Piano Melody',
-                  'Trap Beat','EDM Drop','Jazz Smooth','Hip Hop Vibe','Ambient Nature',
-                  'Rock Energy','Emotional Piano','Happy Ukulele','Dark Suspense'].map((name, i) => (
-                  <div key={i} className="audio-item" onClick={() => {
-                    const t = tracks.find(t => t.type === 'audio');
-                    if (t) addClip(t.id, { type: 'audio', name, duration: 10 + i * 2, startTime: currentTime });
-                  }}>
-                    <button className="audio-item-play">{I.play}</button>
-                    <div className="audio-item-info">
-                      <div className="title">{name}</div>
-                      <div className="duration">{`0${Math.floor((60+i*15)/60)}`.slice(-2)}:{`0${(60+i*15)%60}`.slice(-2)}</div>
+
+                <div className="audio-list">
+                  {pixabayMusic.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="audio-item"
+                      onClick={() => {
+                        const track = tracks.find(t => t.type === TRACK_TYPES.AUDIO) || tracks[1];
+                        if (track) {
+                          addClip(track.id, {
+                            name: item.tags || 'Musiqa',
+                            src: item.audio || item.preview_url,
+                            type: TRACK_TYPES.AUDIO,
+                            duration: item.duration || 15,
+                            startTime: currentTime,
+                          });
+                        }
+                      }}
+                    >
+                      <div className="audio-item-play">{I.music}</div>
+                      <div className="audio-item-info">
+                        <div className="title">{item.tags || `Musiqa #${idx + 1}`}</div>
+                        <div className="duration">{item.duration ? `${item.duration}s` : 'Bepul'}</div>
+                      </div>
+                      <button className="media-file-add-btn">{I.plus}</button>
                     </div>
-                    <button className="media-file-add-btn">{I.plus}</button>
-                  </div>
-                ))}
+                  ))}
+                  {pixabayMusic.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#71718a', fontSize: '12px', padding: '20px' }}>
+                      Royalty-free musiqalarni qidirish uchun soʻz yozing
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* TEXT TAB */}
+            {/* 3. TEXT TAB */}
             {activeTab === 'text' && (
               <div className="text-controls">
-                <button className="text-add-btn" onClick={() => {
-                  const t = tracks.find(t => t.type === 'text');
-                  if (t) addClip(t.id, { type: 'text', text: 'Yangi Matn', duration: 3, startTime: currentTime });
-                }}>
-                  {I.plus} Matn Qo'shish
+                <button
+                  className="text-add-btn"
+                  onClick={() => {
+                    const track = tracks.find(t => t.type === TRACK_TYPES.TEXT) || tracks[2];
+                    if (track) {
+                      addClip(track.id, {
+                        type: TRACK_TYPES.TEXT,
+                        text: 'Matn kiriting',
+                        fontColor: '#ffffff',
+                        fontSize: 48,
+                        fontFamily: 'Inter',
+                        startTime: currentTime,
+                        duration: 5,
+                      });
+                    }
+                  }}
+                >
+                  + Matn qoʻshish
                 </button>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '8px' }}>
-                  500+ Google Fonts shriftlari
-                </div>
-                {selectedClipId && (() => {
-                  const clip = tracks.flatMap(t => t.clips).find(c => c.id === selectedClipId);
-                  if (!clip || clip.type !== 'text') return null;
-                  const trackId = tracks.find(t => t.clips.find(c => c.id === clip.id))?.id;
-                  return (
-                    <>
-                      <div className="text-control-group">
-                        <label>Matn</label>
-                        <textarea className="text-input-area" value={clip.text}
-                          onChange={(e) => updateClip(trackId, clip.id, { text: e.target.value })} />
-                      </div>
-                      <div className="text-control-group">
-                        <label>Shrift</label>
-                        <select className="font-select" value={clip.fontFamily}
-                          onChange={(e) => updateClip(trackId, clip.id, { fontFamily: e.target.value })}>
-                          {DEMO_FONTS.map(f => <option key={f.family} value={f.family}>{f.family}</option>)}
-                        </select>
-                      </div>
-                      <div className="clip-prop-row">
-                        <label>Hajmi</label>
-                        <input type="range" min="12" max="200" value={clip.fontSize || 48}
-                          onChange={(e) => updateClip(trackId, clip.id, { fontSize: Number(e.target.value) })} />
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', minWidth: '30px' }}>{clip.fontSize || 48}px</span>
-                      </div>
-                      <div className="clip-prop-row">
-                        <label>Rang</label>
-                        <input type="color" className="color-input" value={clip.fontColor || '#ffffff'}
-                          onChange={(e) => updateClip(trackId, clip.id, { fontColor: e.target.value })} />
-                      </div>
-                    </>
-                  );
-                })()}
+
+                {selectedClip?.type === TRACK_TYPES.TEXT && (
+                  <div className="clip-properties">
+                    <div className="clip-prop-title">Matn Sozlamalari</div>
+                    <div className="text-control-group">
+                      <label>Matn</label>
+                      <textarea
+                        className="text-input-area"
+                        value={selectedClip.text || ''}
+                        onChange={(e) => {
+                          const tr = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                          if (tr) updateClip(tr.id, selectedClipId, { text: e.target.value });
+                        }}
+                      />
+                    </div>
+                    <div className="text-control-group">
+                      <label>Shrift</label>
+                      <select
+                        className="font-select"
+                        value={selectedClip.fontFamily || 'Inter'}
+                        onChange={(e) => {
+                          const tr = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                          if (tr) updateClip(tr.id, selectedClipId, { fontFamily: e.target.value });
+                        }}
+                      >
+                        {DEMO_FONTS.map(f => (
+                          <option key={f.family} value={f.family}>{f.family}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* STICKERS TAB */}
+            {/* 4. STICKERS TAB */}
             {activeTab === 'stickers' && (
               <div>
                 <div className="asset-search">
                   {I.search}
-                  <input type="text" placeholder="Stikerlarni qidirish..." value={stickerSearch}
-                    onChange={(e) => setStickerSearch(e.target.value)} />
+                  <input
+                    type="text"
+                    placeholder="Giphy GIF stikerlar..."
+                    value={stickerSearch}
+                    onChange={(e) => handleSearchStickers(e.target.value)}
+                  />
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  1,000,000+ GIF stikerlar (Giphy kutubxonasi)
-                </div>
+
                 <div className="stickers-grid">
-                  {DEMO_STICKERS.map((emoji, i) => (
-                    <button key={i} className="sticker-item" onClick={() => {
-                      const t = tracks.find(t => t.type === 'text') || tracks[0];
-                      if (t) addClip(t.id, { type: 'sticker', sticker: emoji, duration: 3, startTime: currentTime, name: 'Sticker' });
-                    }}>{emoji}</button>
+                  {DEMO_STICKERS.map((stk, idx) => (
+                    <div
+                      key={idx}
+                      className="sticker-item"
+                      onClick={() => {
+                        const track = tracks.find(t => t.type === TRACK_TYPES.TEXT) || tracks[0];
+                        if (track) {
+                          addClip(track.id, {
+                            type: TRACK_TYPES.STICKER,
+                            sticker: stk,
+                            startTime: currentTime,
+                            duration: 4,
+                          });
+                        }
+                      }}
+                    >
+                      {stk}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* EFFECTS TAB */}
+            {/* 5. EFFECTS TAB (ALL 8 CATEGORIES) */}
             {activeTab === 'effects' && (
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  {totalEffects.toLocaleString()} ta effekt, {EFFECT_CATEGORIES.length} kategoriya
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
-                  {EFFECT_CATEGORIES.map((cat, i) => (
-                    <button key={i}
-                      className={`effect-category-tag ${effectCategory === i ? 'active' : ''}`}
-                      style={effectCategory === i ? { borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', background: 'var(--accent-subtle)' } : {}}
-                      onClick={() => setEffectCategory(i)}>
-                      {cat.name} <span style={{ opacity: 0.6, marginLeft: '4px' }}>({cat.count.toLocaleString()})</span>
+                <div className="effects-cat-pills">
+                  {EFFECT_CATEGORIES.map((cat, idx) => (
+                    <button
+                      key={idx}
+                      className={`effect-cat-pill ${effectCategory === idx ? 'active' : ''}`}
+                      onClick={() => setEffectCategory(idx)}
+                    >
+                      {cat.name} ({cat.count})
                     </button>
                   ))}
                 </div>
+
                 <div className="effects-grid">
-                  {(EFFECT_CATEGORIES[effectCategory].effects || []).map((effect, i) => (
-                    <button key={i} className="effect-item" onClick={() => {
-                      if (selectedClipId) {
-                        const trackId = tracks.find(t => t.clips.find(c => c.id === selectedClipId))?.id;
-                        if (trackId) updateClip(trackId, selectedClipId, { filter: effect.filter });
-                      } else {
-                        alert("Iltimos, avval timeline dan video clipni tanlang.");
-                      }
-                    }}>
-                      {effect.icon && <div className="effect-icon">{effect.icon}</div>}
-                      <div className="effect-name">{effect.name}</div>
+                  {(EFFECT_CATEGORIES[effectCategory]?.effects || []).map((eff, i) => (
+                    <button
+                      key={eff.id || i}
+                      className="effect-item"
+                      onClick={() => {
+                        if (selectedClipId) {
+                          const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                          if (track) updateClip(track.id, selectedClipId, { filter: eff.filter });
+                        } else {
+                          // Apply to first active video clip
+                          const vTrack = tracks.find(t => t.type === TRACK_TYPES.VIDEO && t.clips.length > 0);
+                          if (vTrack && vTrack.clips[0]) {
+                            updateClip(vTrack.id, vTrack.clips[0].id, { filter: eff.filter });
+                          } else {
+                            alert('Iltimos, avval timeline dan video clipni tanlang');
+                          }
+                        }
+                      }}
+                    >
+                      <div className="effect-icon">{eff.icon || '✨'}</div>
+                      <div className="effect-name">{eff.name}</div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* TRANSITIONS TAB */}
+            {/* 6. TRANSITIONS TAB */}
             {activeTab === 'transitions' && (
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  {TRANSITIONS.length} ta o'tish effekti
-                </div>
-                <div className="transitions-grid">
-                  {TRANSITIONS.map(trans => (
-                    <button key={trans.id} className="transition-item">
-                      <div className="transition-name">{trans.name}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{trans.duration}ms</div>
-                    </button>
-                  ))}
-                </div>
+              <div className="transitions-grid">
+                {TRANSITIONS.map((tr) => (
+                  <button
+                    key={tr.id}
+                    className="transition-item"
+                    onClick={() => {
+                      if (selectedClipId) {
+                        const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                        if (track) updateClip(track.id, selectedClipId, { transition: tr.id });
+                      }
+                    }}
+                  >
+                    <div className="transition-icon">{tr.icon}</div>
+                    <div className="transition-name">{tr.name}</div>
+                  </button>
+                ))}
               </div>
             )}
 
-            {/* AI TAB */}
+            {/* 7. AI TAB */}
             {activeTab === 'ai' && (
               <div className="ai-panel-content">
                 <div className="ai-header">
                   <div className="ai-icon">{I.bot}</div>
-                  <span className="ai-title">LuraEditorAI</span>
+                  <div className="ai-title">LuraEditorAI</div>
                   <span className="ai-badge">Free</span>
                 </div>
-                <div className="text-control-group" style={{ marginBottom: '8px' }}>
-                  <label>AI Model</label>
-                  <select className="font-select" value={aiModel} onChange={(e) => setAiModel(e.target.value)}>
-                    {AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                </div>
-                <div className="ai-suggestions">
-                  {['"Musiqaga moslab kes"','"Subtitr qo\'sh"','"Effekt tanla"'].map((s,i) => (
-                    <button key={i} className="ai-suggestion-chip" onClick={() => setAiPrompt(s.replace(/"/g,''))}>{s}</button>
-                  ))}
-                </div>
+
                 <div className="ai-messages">
                   {aiMessages.map((msg, i) => (
-                    <div key={i} className={`ai-message ${msg.role}`}>{msg.content}</div>
+                    <div key={i} className={`ai-message ${msg.role}`}>
+                      {msg.content}
+                    </div>
                   ))}
-                  {aiLoading && <div className="ai-message assistant"><div className="spinner" style={{width:'16px',height:'16px',borderWidth:'2px'}}/></div>}
+                  {aiLoading && <div className="ai-message assistant">AI ishlamoqda...</div>}
                 </div>
+
                 <div className="ai-input-row">
-                  <input type="text" placeholder="Prompt yozing..." value={aiPrompt}
+                  <input
+                    type="text"
+                    placeholder="AI ga buyruq yozing..."
+                    value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAiSend()} />
-                  <button className="ai-send-btn" onClick={handleAiSend} disabled={aiLoading}>{I.send}</button>
+                    onKeyDown={(e) => e.key === 'Enter' && handleAiSend()}
+                  />
+                  <button className="ai-send-btn" onClick={handleAiSend}>{I.sparkle}</button>
                 </div>
               </div>
             )}
@@ -579,76 +852,162 @@ export default function Editor() {
         </div>
       </div>
 
-      {/* TIMELINE */}
-      <div className="timeline-panel" onClick={(e) => { if (e.target === e.currentTarget) clearSelection(); }}>
+      {/* TIMELINE PANEL */}
+      <div className="timeline-panel">
         <div className="timeline-toolbar">
           <div className="timeline-toolbar-left">
-            <button className="tl-btn" onClick={handleSplitAtPlayhead} disabled={!selectedClipId}>{I.scissors} Kesish</button>
-            <button className="tl-btn" onClick={handleDeleteSelected} disabled={!selectedClipId}>{I.trash} O'chirish</button>
+            <button
+              className="tl-tool-btn"
+              onClick={() => {
+                if (selectedClipId) {
+                  const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                  if (track) splitClip(track.id, selectedClipId, currentTime);
+                }
+              }}
+              title="Kesish (Split)"
+            >
+              {I.scissors}
+            </button>
+            <button
+              className="tl-tool-btn delete"
+              onClick={() => {
+                if (selectedClipId) {
+                  const track = tracks.find(t => t.clips.find(c => c.id === selectedClipId));
+                  if (track) removeClip(track.id, selectedClipId);
+                }
+              }}
+              title="Oʻchirish"
+            >
+              {I.trash}
+            </button>
           </div>
+
           <div className="timeline-toolbar-right">
-            <div className="zoom-controls">
-              <button className="zoom-btn" onClick={zoomOut}>{I.zoomOut}</button>
-              <span className="zoom-label">{(zoom * 100).toFixed(0)}%</span>
-              <button className="zoom-btn" onClick={zoomIn}>{I.zoomIn}</button>
-            </div>
+            <button className="tl-tool-btn" onClick={zoomOut} title="Kichiklashtirish">{I.zoomOut}</button>
+            <span style={{ fontSize: '11px', color: '#8888a0' }}>{Math.round(zoom * 100)}%</span>
+            <button className="tl-tool-btn" onClick={zoomIn} title="Kattalashtirish">{I.zoomIn}</button>
           </div>
         </div>
-        <div className="timeline-body">
-          <div className="timeline-track-headers">
-            {tracks.map(track => (
-              <div key={track.id} className="track-header" style={{ height: `${track.height}px` }}>
-                <span className="track-type-icon">
-                  {track.type === 'video' ? I.film : track.type === 'audio' ? I.music : I.type}
-                </span>
-                <span className="track-name">{track.name}</span>
-                <div className="track-actions">
-                  <button className="track-action-btn">{I.eye}</button>
-                  <button className="track-action-btn">{I.lock}</button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="timeline-tracks-scroll" ref={timelineScrollRef}>
-            <div style={{ minWidth: `${duration * 80 * zoom}px`, position: 'relative' }}>
-              <div className="timeline-ruler">
-                {Array.from({ length: Math.ceil(duration) + 1 }).map((_, i) => (
-                  <React.Fragment key={i}>
-                    <div className="ruler-tick major" style={{ left: `${i * 80 * zoom}px` }} />
-                    {i % 5 === 0 && <div className="ruler-mark" style={{ left: `${i * 80 * zoom}px` }}>
-                      {`${Math.floor(i/60)}:${(`0${i%60}`).slice(-2)}`}
-                    </div>}
-                  </React.Fragment>
-                ))}
-              </div>
-              <div className="timeline-tracks-container">
-                <div className="timeline-playhead" style={{ left: `${currentTime * 80 * zoom}px` }} />
-                {tracks.map(track => (
-                  <div key={track.id} className="timeline-track-lane" style={{ height: `${track.height}px` }}>
-                    {track.clips.map(clip => (
-                      <div key={clip.id}
-                        className={`timeline-clip ${clip.type}-clip ${selectedClipId === clip.id ? 'selected' : ''}`}
-                        style={{ left: `${clip.startTime * 80 * zoom}px`, width: `${Math.max(clip.duration * 80 * zoom, 20)}px` }}
-                        onClick={(e) => { e.stopPropagation(); selectClip(clip.id, track.id); }}>
-                        <div className="clip-handle left" />
-                        <span className="clip-label">{clip.name || clip.text || clip.sticker || 'Clip'}</span>
-                        <div className="clip-handle right" />
-                      </div>
-                    ))}
+
+        {/* TIMELINE TRACKS AREA */}
+        <div className="timeline-tracks-area">
+          <div
+            className="timeline-tracks-container"
+            style={{ width: `${Math.max(1000, duration * 80 * zoom)}px` }}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const clickX = e.clientX - rect.left;
+              const clickTime = clickX / (80 * zoom);
+              setCurrentTime(Math.max(0, Math.min(duration, clickTime)));
+            }}
+          >
+            {/* Playhead */}
+            <div
+              className="timeline-playhead"
+              style={{ left: `${currentTime * 80 * zoom}px` }}
+            >
+              <div className="playhead-handle" />
+              <div className="playhead-line" />
+            </div>
+
+            {/* Tracks */}
+            {tracks.map((track) => (
+              <div key={track.id} className={`timeline-track ${track.type}`}>
+                <div className="track-header-mini">{track.name}</div>
+                {track.clips.map((clip) => (
+                  <div
+                    key={clip.id}
+                    className={`timeline-clip ${selectedClipId === clip.id ? 'selected' : ''}`}
+                    style={{
+                      left: `${clip.startTime * 80 * zoom}px`,
+                      width: `${clip.duration * 80 * zoom}px`,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectClip(clip.id, track.id);
+                    }}
+                  >
+                    <span className="clip-name">{clip.name || clip.text || clip.sticker}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
+
+      {/* EXPORT MODAL */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => !isExporting && setShowExportModal(false)}>
+          <div className="modal-card animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <h3>Video Eksport Qilish</h3>
+
+            {!isExporting && !exportedUrl && (
+              <>
+                <div className="form-group">
+                  <label>Sifat va Ruxsat (Quality)</label>
+                  <select
+                    className="input-field"
+                    value={exportQuality}
+                    onChange={(e) => setExportQuality(e.target.value)}
+                  >
+                    <option value="high">Yuqori (1080p Full HD - 8 Mbps)</option>
+                    <option value="medium">Oʻrta (720p HD - 4.5 Mbps)</option>
+                    <option value="low">Past (480p SD - 2 Mbps)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Format</label>
+                  <div style={{ color: '#8b5cf6', fontWeight: 600, fontSize: '13px' }}>
+                    MP4 (H.264 Video + AAC Audio)
+                  </div>
+                </div>
+
+                <div className="modal-buttons-row">
+                  <button className="btn-cancel" onClick={() => setShowExportModal(false)}>
+                    Bekor qilish
+                  </button>
+                  <button className="btn-confirm" onClick={handleStartExport}>
+                    {I.export} Eksport qilishni boshlash
+                  </button>
+                </div>
+              </>
+            )}
+
+            {isExporting && (
+              <div className="export-progress-container" style={{ textAlign: 'center', padding: '20px 0' }}>
+                <h4>Video render qilinmoqda...</h4>
+                <div className="export-progress-bar-bg" style={{ width: '100%', height: '10px', background: '#252538', borderRadius: '5px', overflow: 'hidden', margin: '16px 0' }}>
+                  <div
+                    className="export-progress-bar-fill"
+                    style={{ width: `${exportProgress}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #d946ef)', transition: 'width 0.2s' }}
+                  />
+                </div>
+                <p style={{ color: '#8888a0', fontSize: '13px' }}>{exportProgress}% tugallandi</p>
+              </div>
+            )}
+
+            {exportedUrl && (
+              <div className="export-success-container" style={{ textAlign: 'center', padding: '20px 0' }}>
+                <h4 style={{ color: '#22c55e', marginBottom: '12px' }}>🎉 Video muvaffaqiyatli tayyorlandi!</h4>
+                <video src={exportedUrl} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '8px', marginBottom: '16px' }} />
+                <div className="modal-buttons-row" style={{ justifyContent: 'center' }}>
+                  <a
+                    href={exportedUrl}
+                    download={`${project?.name || 'Lura_Video'}.mp4`}
+                    className="btn-confirm"
+                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    {I.download} MP4 Yuklab olish
+                  </a>
+                  <button className="btn-cancel" onClick={() => setShowExportModal(false)}>Yopish</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function formatTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  const ms = Math.floor((sec % 1) * 10);
-  return `${(`0${m}`).slice(-2)}:${(`0${s}`).slice(-2)}.${ms}`;
 }

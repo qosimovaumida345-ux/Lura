@@ -15,9 +15,19 @@ async function request(endpoint, options = {}) {
       ...options,
       headers,
     });
+
+    if (res.status === 401) {
+      localStorage.removeItem('lura_token');
+      localStorage.removeItem('lura_user');
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+      throw new Error('Sessiya muddati tugadi. Iltimos qaytadan kiring.');
+    }
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error(err.message || 'Request failed');
+      throw new Error(err.error || err.message || 'Soʻrov muvaffaqiyatsiz tugadi');
     }
     return res.json();
   } catch (error) {
@@ -43,5 +53,4 @@ export const api = {
   // Assets
   searchStickers: (q) => request(`/assets/stickers?q=${encodeURIComponent(q)}`),
   searchMusic: (q) => request(`/assets/music?q=${encodeURIComponent(q)}`),
-  getFonts: () => request('/assets/fonts'),
 };
