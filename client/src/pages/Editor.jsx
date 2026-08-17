@@ -115,7 +115,8 @@ export default function Editor() {
 
     tracks.forEach((track) => {
       track.clips.forEach((clip) => {
-        if (clip.src && clip.type === TRACK_TYPES.VIDEO) {
+        const isImage = clip.mediaType === 'image' || (clip.name && clip.name.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i));
+        if (clip.src && clip.type === TRACK_TYPES.VIDEO && !isImage) {
           currentClipIds.add(clip.id);
           if (!decodersRef.current.has(clip.id)) {
             const decoder = new LuraVideoDecoder(clip.src, () => {
@@ -225,30 +226,74 @@ export default function Editor() {
       return;
     }
 
-    // 1. Render Video Tracks with WebCodecs decoded frame
+    // 1. Render Video Tracks with WebCodecs decoded frame or Image
     tracks.filter(t => t.visible && t.type === TRACK_TYPES.VIDEO).forEach((track) => {
       track.clips.forEach((clip) => {
         if (time >= clip.startTime && time < clip.startTime + clip.duration) {
           const relTime = time - clip.startTime + (clip.offset || 0);
-          const decoder = decodersRef.current.get(clip.id);
 
-          if (decoder && decoder.isReady) {
-            decoder.renderFrameToCanvas(ctx, relTime, 0, 0, canvas.width, canvas.height, clip.filter || 'none');
-          } else if (clip.src) {
-            // Placeholder while loading
-            ctx.save();
-            if (clip.filter && clip.filter !== 'none') ctx.filter = clip.filter;
-            ctx.fillStyle = '#1c1c2b';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#8b5cf6';
-            ctx.beginPath();
-            ctx.arc(canvas.width / 2, canvas.height / 2, 70, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 18px Inter';
-            ctx.textAlign = 'center';
-            ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 + 100);
-            ctx.restore();
+          const isImage = clip.mediaType === 'image' || (clip.name && clip.name.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i));
+
+          if (isImage) {
+            let img = decodersRef.current.get(clip.id);
+            if (!img) {
+              img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.src = clip.src;
+              img.onload = () => {
+                decodersRef.current.set(clip.id, img);
+                setCurrentTime(useTimelineStore.getState().currentTime);
+              };
+              decodersRef.current.set(clip.id, img); // Store pending to avoid multiple fetches
+            }
+            if (img.complete && img.naturalWidth) {
+              ctx.save();
+              if (clip.filter && clip.filter !== 'none') ctx.filter = clip.filter;
+              // Center and cover/contain the image on the canvas
+              const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+              const w = img.naturalWidth * scale;
+              const h = img.naturalHeight * scale;
+              const dx = (canvas.width - w) / 2;
+              const dy = (canvas.height - h) / 2;
+              ctx.drawImage(img, dx, dy, w, h);
+              ctx.restore();
+            } else {
+              // Placeholder while loading image
+              ctx.save();
+              if (clip.filter && clip.filter !== 'none') ctx.filter = clip.filter;
+              ctx.fillStyle = '#1c1c2b';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = '#8b5cf6';
+              ctx.beginPath();
+              ctx.arc(canvas.width / 2, canvas.height / 2, 70, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 18px Inter';
+              ctx.textAlign = 'center';
+              ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 + 100);
+              ctx.restore();
+            }
+          } else {
+            const decoder = decodersRef.current.get(clip.id);
+
+            if (decoder && decoder.isReady) {
+              decoder.renderFrameToCanvas(ctx, relTime, 0, 0, canvas.width, canvas.height, clip.filter || 'none');
+            } else if (clip.src) {
+              // Placeholder while loading video
+              ctx.save();
+              if (clip.filter && clip.filter !== 'none') ctx.filter = clip.filter;
+              ctx.fillStyle = '#1c1c2b';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = '#8b5cf6';
+              ctx.beginPath();
+              ctx.arc(canvas.width / 2, canvas.height / 2, 70, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 18px Inter';
+              ctx.textAlign = 'center';
+              ctx.fillText(clip.name, canvas.width / 2, canvas.height / 2 + 100);
+              ctx.restore();
+            }
           }
         }
       });
@@ -313,6 +358,7 @@ export default function Editor() {
         type: trackType,
         duration: file.duration || 5,
         startTime: currentTime,
+        mediaType: file.type,
       });
     }
   };

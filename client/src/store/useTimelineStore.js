@@ -83,6 +83,7 @@ export const useTimelineStore = create((set, get) => ({
       duration: clip.duration || 5,
       offset: clip.offset || 0,
       type: clip.type || TRACK_TYPES.VIDEO,
+      mediaType: clip.mediaType || 'video',
       color: clip.color || null,
       // Video specific
       src: clip.src || null,
