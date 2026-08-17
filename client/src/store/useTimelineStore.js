@@ -25,7 +25,12 @@ export const useTimelineStore = create((set, get) => ({
   // ---- Playback ----
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
-  togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
+  togglePlay: () => set((s) => {
+    if (s.isPlaying) {
+      return { isPlaying: false, currentTime: 0 };
+    }
+    return { isPlaying: true };
+  }),
 
   // ---- Zoom ----
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)), pixelsPerSecond: 80 * Math.max(0.1, Math.min(5, zoom)) }),

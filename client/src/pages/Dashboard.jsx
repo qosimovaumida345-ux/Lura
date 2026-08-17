@@ -300,24 +300,9 @@ export default function Dashboard() {
                           </div>
 
                           <div className="card-actions-wrapper" onClick={(e) => e.stopPropagation()}>
-                            <button className="action-dots-btn" onClick={() => setActiveMenuId(activeMenuId === p.id ? null : p.id)}>
-                              {I.more}
+                            <button className="action-dots-btn menu-delete" onClick={(e) => handleDelete(e, p.id)} title="Oʻchirish">
+                              {I.trash}
                             </button>
-
-                            {activeMenuId === p.id && (
-                              <div className="card-context-menu animate-scale-in">
-                                <button onClick={(e) => handleRename(e, p)}>
-                                  {I.edit} Nomini oʻzgartirish
-                                </button>
-                                <button onClick={(e) => handleDuplicate(e, p.id)}>
-                                  {I.copy} Nusxasini yaratish
-                                </button>
-                                <div className="menu-divider" />
-                                <button className="menu-delete" onClick={(e) => handleDelete(e, p.id)}>
-                                  {I.trash} Oʻchirish
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>

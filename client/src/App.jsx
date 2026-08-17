@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import Login from './pages/Login';
+import Success from './pages/Success';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -21,6 +22,14 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function NativeOnlyRoute({ children }) {
+  const isNativeApp = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNativePlatform());
+  if (!isNativeApp) {
+    return <Navigate to="/success" replace />;
+  }
+  return children;
+}
+
 function PublicHomeRoute() {
   const { isAuthenticated } = useAuthStore();
   const isNativeApp = typeof window !== 'undefined' && (window.__TAURI__ || window.Capacitor?.isNativePlatform());
@@ -29,7 +38,7 @@ function PublicHomeRoute() {
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
   }
 
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Landing />;
+  return isAuthenticated ? <Navigate to="/success" replace /> : <Landing />;
 }
 
 export default function App() {
@@ -43,10 +52,11 @@ export default function App() {
     <Routes>
       <Route path="/" element={<PublicHomeRoute />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/success" element={<ProtectedRoute><Success /></ProtectedRoute>} />
       
-      {/* Protected Routes */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/editor/:projectId" element={<ProtectedRoute><Editor /></ProtectedRoute>} />
+      {/* Protected Routes - Native Only */}
+      <Route path="/dashboard" element={<ProtectedRoute><NativeOnlyRoute><Dashboard /></NativeOnlyRoute></ProtectedRoute>} />
+      <Route path="/editor/:projectId" element={<ProtectedRoute><NativeOnlyRoute><Editor /></NativeOnlyRoute></ProtectedRoute>} />
       
       {/* 404 Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

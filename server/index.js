@@ -6,10 +6,31 @@ const fs = require('fs');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'lura_jwt_secret_key_2026';
+
+// --- PostgreSQL Setup ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+// Initialize DB Table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(255) PRIMARY KEY,
+    google_id VARCHAR(255) UNIQUE NOT NULL,
+    display_name VARCHAR(255),
+    email VARCHAR(255),
+    avatar_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`).catch(err => console.error('DB Init Error:', err));
 
 // --- Trust Proxy for Render HTTPS ---
 app.set('trust proxy', 1);
@@ -21,40 +42,6 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(passport.initialize());
-
-// --- Persistent JSON Database Storage ---
-const DATA_DIR = path.join(__dirname, 'data');
-const DB_FILE = path.join(DATA_DIR, 'db.json');
-
-function initDb() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = { users: [], projects: [] };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
-  }
-}
-
-function readDb() {
-  initDb();
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Error reading db.json, returning empty defaults:', err);
-    return { users: [], projects: [] };
-  }
-}
-
-function writeDb(data) {
-  initDb();
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error writing to db.json:', err);
-  }
-}
 
 // --- JWT Auth Middleware ---
 function authMiddleware(req, res, next) {
@@ -81,23 +68,43 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     callbackURL: "/auth/google/callback",
     proxy: true
   },
-  function(accessToken, refreshToken, profile, cb) {
-    const db = readDb();
-    let user = db.users.find(u => u.googleId === profile.id);
-    
-    if (!user) {
-      user = {
-        id: `user_${Date.now()}`,
-        googleId: profile.id,
-        display_name: profile.displayName,
-        email: (profile.emails && profile.emails[0]) ? profile.emails[0].value : '',
-        avatar_url: (profile.photos && profile.photos[0]) ? profile.photos[0].value : '',
-        createdAt: new Date().toISOString(),
-      };
-      db.users.push(user);
-      writeDb(db);
+  async function(accessToken, refreshToken, profile, cb) {
+    try {
+      let result = await pool.query('SELECT * FROM users WHERE google_id = $1', [profile.id]);
+      let user;
+
+      if (result.rows.length === 0) {
+        const userId = `user_${Date.now()}`;
+        const email = (profile.emails && profile.emails[0]) ? profile.emails[0].value : '';
+        const avatar = (profile.photos && profile.photos[0]) ? profile.photos[0].value : '';
+        
+        await pool.query(
+          'INSERT INTO users (id, google_id, display_name, email, avatar_url) VALUES ($1, $2, $3, $4, $5)',
+          [userId, profile.id, profile.displayName, email, avatar]
+        );
+        
+        user = {
+          id: userId,
+          googleId: profile.id,
+          display_name: profile.displayName,
+          email: email,
+          avatar_url: avatar
+        };
+      } else {
+        const row = result.rows[0];
+        user = {
+          id: row.id,
+          googleId: row.google_id,
+          display_name: row.display_name,
+          email: row.email,
+          avatar_url: row.avatar_url
+        };
+      }
+      return cb(null, user);
+    } catch (err) {
+      console.error('OAuth Error:', err);
+      return cb(err, null);
     }
-    return cb(null, user);
   }));
 
   app.get('/auth/google',
@@ -116,69 +123,31 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // 1. Health Check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Lura Backend 2.0 is running!', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', message: 'Lura Backend Postgres is running!', timestamp: new Date().toISOString() });
 });
 
 // 2. Auth ME Endpoint
-app.get('/api/auth/me', authMiddleware, (req, res) => {
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Foydalanuvchi topilmadi' });
+    }
+    const row = result.rows[0];
+    const user = {
+      id: row.id,
+      googleId: row.google_id,
+      display_name: row.display_name,
+      email: row.email,
+      avatar_url: row.avatar_url
+    };
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
   }
-  res.json({ user });
 });
 
-// 3. Projects API (Protected with Auth Middleware)
-app.get('/api/projects', authMiddleware, (req, res) => {
-  const db = readDb();
-  const userProjects = db.projects.filter(p => !p.userId || p.userId === req.user.id);
-  res.json(userProjects);
-});
-
-app.post('/api/projects', authMiddleware, (req, res) => {
-  const db = readDb();
-  const newProject = {
-    id: req.body.id || `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name: req.body.name || 'Sarlavhasiz loyiha',
-    userId: req.user.id,
-    settings: req.body.settings || { width: 1920, height: 1080, fps: 30, aspectRatio: '16:9' },
-    timelineData: req.body.timelineData || { tracks: [], duration: 0 },
-    thumbnail: req.body.thumbnail || null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-
-  db.projects.unshift(newProject);
-  writeDb(db);
-  res.status(201).json(newProject);
-});
-
-app.put('/api/projects/:id', authMiddleware, (req, res) => {
-  const db = readDb();
-  const index = db.projects.findIndex(p => p.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Loyiha topilmadi' });
-  }
-
-  db.projects[index] = {
-    ...db.projects[index],
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  };
-
-  writeDb(db);
-  res.json(db.projects[index]);
-});
-
-app.delete('/api/projects/:id', authMiddleware, (req, res) => {
-  const db = readDb();
-  db.projects = db.projects.filter(p => p.id !== req.params.id);
-  writeDb(db);
-  res.json({ success: true });
-});
-
-// 4. AI Proxy Route (OpenRouter)
+// 3. AI Proxy Route (OpenRouter)
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { messages } = req.body;
@@ -218,7 +187,7 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-// 5. Assets Free Proxy Routes (Pixabay & Giphy)
+// 4. Assets Free Proxy Routes (Pixabay & Giphy)
 app.get('/api/assets/music', async (req, res) => {
   const query = req.query.q || 'vlog';
   const apiKey = process.env.PIXABAY_API_KEY;

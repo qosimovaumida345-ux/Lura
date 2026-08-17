@@ -959,7 +959,9 @@ export default function Editor() {
             {/* Tracks */}
             {tracks.map((track) => (
               <div key={track.id} className={`timeline-track ${track.type}`}>
-                <div className="track-header-mini">{track.name}</div>
+                <div className="track-header-mini" title={track.name}>
+                  {track.type === TRACK_TYPES.VIDEO ? I.film : track.type === TRACK_TYPES.AUDIO ? I.music : I.type}
+                </div>
                 {track.clips.map((clip) => (
                   <div
                     key={clip.id}
@@ -973,7 +975,9 @@ export default function Editor() {
                       selectClip(clip.id, track.id);
                     }}
                   >
-                    <span className="clip-name">{clip.name || clip.text || clip.sticker}</span>
+                    <span className="clip-name">
+                      {clip.name || clip.text || clip.sticker} ({clip.duration.toFixed(1)}s)
+                    </span>
                   </div>
                 ))}
               </div>
